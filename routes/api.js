@@ -54,6 +54,12 @@ module.exports = function (app) {
     
     .delete(function(req, res){
       //if successful response will be 'complete delete successful'
+      MongoClient.connect(MONGODB_CONNECTION_STRING, function(err, db) {
+        expect(err, 'database error').to.not.exist;
+        var collection = db.collection('books');
+        collection.remove();
+        res.send("complete delete successful");
+      });
     });
 
 
@@ -61,18 +67,54 @@ module.exports = function (app) {
   app.route('/api/books/:id')
     .get(function (req, res){
       var bookid = req.params.id;
+      //expect(bookid).to.have.lengthOf(24);
+      var oid = new ObjectId(bookid); //Must convert to mongo object id to search by it in db
+      MongoClient.connect(MONGODB_CONNECTION_STRING, function(err, db) {
+        expect(err, 'database error').to.not.exist;
+        var collection = db.collection('books');
+        collection.find({_id:oid}).toArray(function(err, result) {
+          expect(err, 'database find error').to.not.exist;
+          if(result.length === 0) {
+            res.send('no book exists');
+          } else {
+            res.json(result[0]);
+          }
+        });
+      });
       //json res format: {"_id": bookid, "title": book_title, "comments": [comment,comment,...]}
     })
     
     .post(function(req, res){
       var bookid = req.params.id;
+      var oid = new ObjectId(bookid); //Must convert to mongo object id to search by it in db
       var comment = req.body.comment;
-      //json res format same as .get
+      MongoClient.connect(MONGODB_CONNECTION_STRING, function(err, db) {
+        expect(err, 'database error').to.not.exist;
+        var collection = db.collection('books');
+        collection.findAndModify(
+          {_id: oid},
+          {},
+          {$push: { comments: comment }},
+          {new: true, upsert: false},
+          function(err, result){
+            expect(err, 'database findAndModify error').to.not.exist;
+            res.json(result.value);
+          });
+      });
     })
     
     .delete(function(req, res){
       var bookid = req.params.id;
-      //if successful response will be 'delete successful'
+      var oid = new ObjectId(bookid); //Must convert to mongo object id to search by it in db
+      MongoClient.connect(MONGODB_CONNECTION_STRING, function(err, db) {
+        expect(err, 'database error').to.not.exist;
+        var collection = db.collection('books');
+        collection.findOneAndDelete({_id:oid}, function(err, result) {
+          expect(err, 'database findOneAndDelete error').to.not.exist;
+          expect(result, 'result error').to.exist;
+          res.send("delete successful");
+        });
+      });
     });
   
 };
